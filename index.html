@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Elite Crime & Espionage Library</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    :root {
+      --bg-deep: #0a0a0c;
+      --card-bg: #16161a;
+      --accent: #e50914;
+      --watched: #10b981;
+    }
+    body {
+      background-color: var(--bg-deep);
+      color: #e5e7eb;
+      font-family: 'Inter', sans-serif;
+    }
+    .show-card {
+      background: var(--card-bg);
+      border: 1px solid #2d2d35;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .show-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-4px);
+    }
+    .watched-badge {
+      background-color: var(--watched);
+      color: white;
+    }
+    .tag {
+      background: #2d2d35;
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .trailer-thumb {
+      aspect-ratio: 16 / 9;
+      background-size: cover;
+      background-position: center;
+      background-color: #111;
+    }
+  </style>
+</head>
+
+<body class="p-4 md:p-8">
+
+  <header class="max-w-6xl mx-auto mb-12 border-b border-gray-800 pb-8">
+    <div class="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+      <div>
+        <h1 class="text-4xl md:text-5xl font-black tracking-tighter text-white mb-2 italic">THE LIBRARY.</h1>
+        <p class="text-gray-400 text-lg">Curated Intelligence & High-Stakes European Crime.</p>
+      </div>
+      <div class="text-right">
+        <p class="text-[10px] font-mono text-zinc-600 uppercase">Storage</p>
+        <p id="storage-status" class="text-xs font-mono text-zinc-400">Local (this browser)</p>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap gap-4 mt-6">
+      <span class="flex items-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full"></div> Watched</span>
+      <span class="flex items-center gap-2"><div class="w-3 h-3 bg-gray-600 rounded-full"></div> Unseen</span>
+    </div>
+  </header>
+
+  <div class="max-w-6xl mx-auto mb-8 flex flex-wrap gap-2">
+    <button onclick="window.filterContent('all')" id="btn-all"
+      class="px-4 py-2 bg-white text-black font-bold rounded-md hover:bg-gray-200 transition">
+      All Ops
+    </button>
+    <button onclick="window.filterContent('unseen')" id="btn-unseen"
+      class="px-4 py-2 bg-zinc-800 text-white font-bold rounded-md hover:bg-zinc-700 transition">
+      Unseen
+    </button>
+    <button onclick="window.filterContent('upcoming')" id="btn-upcoming"
+      class="px-4 py-2 bg-zinc-800 text-white font-bold rounded-md hover:bg-zinc-700 transition">
+      2026 Schedule
+    </button>
+
+    <button onclick="window.resetLibrary()" id="btn-reset"
+      class="ml-auto px-4 py-2 bg-zinc-900 text-white font-bold rounded-md hover:bg-zinc-800 transition border border-zinc-700">
+      Reset (local)
+    </button>
+  </div>
+
+  <main id="libraryGrid" class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <!-- Content injected by JS -->
+  </main>
+
+  <script>
+    // =========================
+    // Local-only standalone app
+    // - No Firebase
+    // - Persists "watched" flags in localStorage
+    // =========================
+
+    const STORAGE_KEY = "elite_crime_library_v1";
+
+    // Curated Library Initial State
+    const initialShows = [
+      { name: "4 Blocks", about: "A German powerhouse about a Lebanese crime family in Berlin. It mirrors Kin's focus on family loyalty vs. the business of crime.", watched: false, type: "Mafia", trailer: "https://www.youtube.com/watch?v=HZQFjQPyD0o" },
+      { name: "Betrayal (ITV)", about: "Heavy-hitting British espionage thriller starring Shaun Evans. Perfect for fans of Homeland; focuses on high-stakes intelligence operation.", watched: false, type: "Espionage", trailer: "https://www.youtube.com/watch?v=NNtxHA1Lq9k" },
+      { name: "Blinded by the Lights", about: "Polish series with visual style identical to ZeroZeroZero. Follows a cocaine dealer in Warsaw whose life unravels over one chaotic week.", watched: false, type: "Crime", trailer: "https://www.youtube.com/watch?v=CVOaVn6iHkg" },
+      { name: "Blood Coast (Pax Massilia)", about: "Set in Marseille. Violent, high-paced, and captures the same 'uncontrollable city' vibe as Naples in Gomorrah.", watched: false, type: "Action", trailer: "https://www.youtube.com/watch?v=nEP2but7fAs" },
+      { name: "Caliphate (Kalifat)", about: "A Swedish thriller that is one of the most intense depictions of radicalisation and counter-terrorism on television.", watched: false, type: "Thriller", trailer: "https://www.youtube.com/watch?v=UhXOhWVTpf8" },
+      { name: "Dope Thief", about: "New 2025 series mirroring the gritty drug trade of ZeroZeroZero, following friends who cross a global narcotics enterprise.", watched: false, type: "Cartel", trailer: "https://www.youtube.com/watch?v=8C8y91N6QI0" },
+      { name: "False Flag (Kfulim)", about: "Israeli series where ordinary citizens are implicated in a Mossad kidnapping. High-tension tradecraft.", watched: false, type: "Spy", trailer: "https://www.youtube.com/watch?v=Mc1_6zrC9d8" },
+      { name: "Fauda", about: "Real IDF experience, breathless tactical operations and the human cost of the Israeli-Palestinian conflict.", watched: true, type: "Tactical", trailer: "https://www.youtube.com/watch?v=wf_-X6ocMHI" },
+      { name: "Gangs of London", about: "Visceral, ultra-violent action of ZeroZeroZero but set in a modern, multi-cultural London.", watched: true, type: "Action", trailer: "https://www.youtube.com/watch?v=1yIPmz_3C20" },
+      { name: "Gomorrah", about: "The ultimate hyper-realist mafia saga. It ignores the glamour to show the rotting nature of power in Naples.", watched: true, type: "Mafia", trailer: "https://www.youtube.com/watch?v=-4QORgagblU" },
+      { name: "Homeland", about: "Modern classic. Early seasons featuring Damian Lewis provide the same 'who can you trust' tension found in The Spy.", watched: true, type: "Spy", trailer: "https://www.youtube.com/watch?v=41RO1q9A4V4" },
+      { name: "Iron Reign (Mano de Hierro)", about: "Set in Barcelona. Like ZeroZeroZero, it shows how a shipping terminal is the heart of a global drug empire.", watched: false, type: "Cartel", trailer: "https://www.youtube.com/watch?v=ql0oL-VIA_0" },
+      { name: "Kin", about: "Slow-burn Irish drama focusing on the unbreakable but suffocating bonds of a Dublin crime family.", watched: true, type: "Crime", trailer: "https://www.youtube.com/watch?v=_byGxUym7HQ" },
+      { name: "Land of Sin (Synden)", about: "Swedish 'Nordic Noir'. Follows an investigator looking into a dark family feud in the countryside.", watched: false, type: "Nordic Noir", trailer: "https://www.youtube.com/watch?v=hujjUJmpJxE" },
+      { name: "Love/Hate", about: "The 'Irish Gomorrah' that paved the way for Kin, focusing on the Dublin criminal underworld.", watched: false, type: "Crime", trailer: "https://www.youtube.com/watch?v=GpQqMVV4S40" },
+      { name: "Manayek", about: "Focuses on internal corruption within the Israeli police. Cynical and grounded like Gomorrah.", watched: false, type: "Police", trailer: "https://www.youtube.com/watch?v=moCib_EP0ww" },
+      { name: "Mobland", about: "Brutal clash between mob families. Anchored by heavyweights Tom Hardy and Pierce Brosnan.", watched: true, type: "Mafia", trailer: "https://www.youtube.com/watch?v=84ekA0PaodY" },
+      { name: "Mocro Maffia", about: "On the same level of brutality as Gomorrah. Follows Moroccan-Dutch gangs in Amsterdam.", watched: false, type: "Mafia", trailer: "https://www.youtube.com/watch?v=kDaOerOLlQE" },
+      { name: "Narco-Saints", about: "True story. Businessman pulled into a mission to take down a drug lord in Suriname. Blends The Spy with ZeroZeroZero.", watched: false, type: "Cartel", trailer: "https://www.youtube.com/watch?v=F-5RFGWXt3E" },
+      { name: "Romanzo Criminale", about: "Legendary Italian series tracking the rise of a powerful criminal gang in 1970s Rome.", watched: false, type: "Mafia", trailer: "https://www.youtube.com/watch?v=gNwQW-Kptsc" },
+      { name: "Salvador (Netflix)", about: "Brand-new Spanish crime series featuring Leonor Watling. Fits your love for gritty European crime.", watched: false, type: "New 2026", trailer: "https://www.youtube.com/watch?v=enYxVohkApA" },
+      { name: "Slow Horses", about: "Cynical take on British intelligence following a group of MI5 'rejects' who find themselves at the centre of conspiracies.", watched: false, type: "Spy", trailer: "https://www.youtube.com/watch?v=O9ZJChzPn0U" },
+      { name: "Snabba Cash", about: "Swedish series blending high-flying tech startups with the brutal reality of gang-led drug trafficking.", watched: false, type: "Cartel", trailer: "https://www.youtube.com/watch?v=yHFBsGdIBzs" },
+      { name: "Suburra Blood on Rome", about: "Italian thriller focusing on the intersection of the mafia, corrupt politicians, and the Vatican.", watched: true, type: "Mafia", trailer: "https://www.youtube.com/watch?v=AYwpxrt7ZLA" },
+      { name: "Tehran", about: "If you liked Fauda, this is your next step. Mossad hacker stranded in Iran.", watched: false, type: "Spy", trailer: "https://www.youtube.com/watch?v=Dmt9tvnFatQ" },
+      { name: "The Agency (2025/2026)", about: "Remake of The Bureau starring Michael Fassbender. Intense, global-reaching espionage and deep-cover tradecraft.", watched: false, type: "Spy", trailer: "https://www.youtube.com/watch?v=42AUSELr1YM" },
+      { name: "The Americans", about: "Critically acclaimed drama about KGB spies in 1980s America. Captures constant paranoia.", watched: false, type: "Spy", trailer: "https://www.youtube.com/watch?v=Cji8AUsEBMc" },
+      { name: "The Bureau (Le Bureau des Légendes)", about: "Masterpiece about deep-cover agents focusing on tradecraft and psychological realism.", watched: false, type: "Spy", trailer: "https://www.youtube.com/watch?v=1yIPmz_3C20" },
+      { name: "The Chestnut Man", about: "Moody Danish Nordic Noir thriller. Intense investigation in Copenhagen.", watched: false, type: "Nordic Noir", trailer: "https://www.youtube.com/watch?v=7VoNqbvMYdc" },
+      { name: "The Day of the Jackal (2024)", about: "Polished European thriller following a high-stakes cat-and-mouse game across the continent.", watched: true, type: "Thriller", trailer: "https://www.youtube.com/watch?v=d9iD-UUL9SA" },
+      { name: "The Hunter (Il Cacciatore)", about: "True story of a prosecutor in 1990s Sicily taking on the Corleonesi Mafia.", watched: false, type: "Mafia", trailer: "https://www.youtube.com/watch?v=NjHAbIz9BqE" },
+      { name: "The Immortal (L'immortale)", about: "Cinematic bridge for Gomorrah universe exploring Ciro Di Marzio's tragic origin story.", watched: true, type: "Mafia", trailer: "https://www.youtube.com/watch?v=fuNcrRMkwtQ" },
+      { name: "The Night Manager", about: "Elite spy thriller where a hotel manager infiltrates the inner circle of an arms dealer.", watched: false, type: "Spy", trailer: "https://www.youtube.com/watch?v=0EZAXmCDgYE" },
+      { name: "The Spy", about: "Sacha Baron Cohen portrays Eli Cohen in this tense, heartbreaking true story of a Mossad agent in Syria.", watched: true, type: "Spy", trailer: "https://www.youtube.com/watch?v=5UijUOy0MmE&t=6s" },
+      { name: "This City Is Ours", about: "Tracks the disintegration of crime leader Ronnie Phelan (Sean Bean) as his retirement triggers a power vacuum.", watched: true, type: "Crime", trailer: "https://www.youtube.com/watch?v=9irsgS7DEUI" },
+      { name: "Top Boy", about: "Intimate portrayal of inner-city gang life and the personal cost of the drug trade in the UK.", watched: false, type: "Crime", trailer: "https://www.youtube.com/watch?v=1bg9SAljqIM" },
+      { name: "Valley of Tears", about: "Visceral production depicting the 1973 Yom Kippur War. Raw, high-stakes military intensity.", watched: false, type: "War", trailer: "https://www.youtube.com/watch?v=ltSvPE8xw3A" },
+      { name: "ZeroZeroZero", about: "A global look at the logistics of crime, following a single shipment across three continents.", watched: true, type: "Cartel", trailer: "https://www.youtube.com/watch?v=gUKUcRCFG0c" }
+    ];
+
+    let currentFilter = "all";
+    let shows = [];
+
+    function safeJsonParse(value) {
+      try { return JSON.parse(value); } catch { return null; }
+    }
+
+    function loadShows() {
+      const saved = safeJsonParse(localStorage.getItem(STORAGE_KEY));
+      if (Array.isArray(saved) && saved.length) return saved.map(normalizeShow);
+      return initialShows.map(normalizeShow);
+    }
+
+    function saveShows(list) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      const el = document.getElementById("storage-status");
+      if (el) el.textContent = "Saved locally";
+      window.setTimeout(() => {
+        if (el) el.textContent = "Local (this browser)";
+      }, 900);
+    }
+
+    function normalizeShow(s) {
+      return {
+        name: String(s?.name ?? ""),
+        about: String(s?.about ?? ""),
+        watched: Boolean(s?.watched),
+        type: String(s?.type ?? ""),
+        trailer: String(s?.trailer ?? "")
+      };
+    }
+
+    function getYTThumb(url) {
+      if (!url || url === "#" || !url.includes("v=")) {
+        return "https://images.unsplash.com/photo-1533422902779-afd35862846a?auto=format&fit=crop&w=800&q=80";
+      }
+      const videoId = url.split("v=")[1]?.split("&")[0];
+      return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    }
+
+    window.toggleWatched = (index) => {
+      if (!shows[index]) return;
+      shows[index].watched = !shows[index].watched;
+      saveShows(shows);
+      renderLibrary(currentFilter);
+    };
+
+    window.filterContent = (type) => {
+      currentFilter = type;
+      renderLibrary(type);
+    };
+
+    window.resetLibrary = () => {
+      localStorage.removeItem(STORAGE_KEY);
+      shows = initialShows.map(normalizeShow);
+      renderLibrary(currentFilter);
+      const el = document.getElementById("storage-status");
+      if (el) el.textContent = "Reset done";
+      window.setTimeout(() => {
+        if (el) el.textContent = "Local (this browser)";
+      }, 900);
+    };
+
+    function renderLibrary(filter = "all") {
+      const grid = document.getElementById("libraryGrid");
+      grid.innerHTML = "";
+
+      ["all", "unseen", "upcoming"].forEach((f) => {
+        const btn = document.getElementById(`btn-${f}`);
+        if (!btn) return;
+        if (f === filter) {
+          btn.classList.add("bg-white", "text-black");
+          btn.classList.remove("bg-zinc-800", "text-white");
+        } else {
+          btn.classList.remove("bg-white", "text-black");
+          btn.classList.add("bg-zinc-800", "text-white");
+        }
+      });
+
+      if (filter === "upcoming") {
+        const upcoming = [
+          { name: "4 Blocks Zero", date: "Mid-2026", about: "Prequel following how the Hamadi family became Berlin's most powerful clan.", source: "HBO / Warner" },
+          { name: "Fauda (Season 5)", date: "Mid-2026", about: "Picks up two years after Oct 7th aftermath. Marseille and Budapest.", source: "Netflix" },
+          { name: "Gomorrah: The Origins", date: "Late 2026", about: "Follows a young Pietro Savastano in 1970s Naples.", source: "Sky Atlantic" },
+          { name: "Line of Duty (Season 7)", date: "Late 2026", about: "Filming begins in Belfast this Spring. Return of AC-12.", source: "BBC One" }
+        ];
+
+        upcoming.forEach((item) => {
+          grid.innerHTML += `
+            <div class="show-card rounded-xl overflow-hidden shadow-2xl border-l-4" style="border-left-color: var(--accent)">
+              <div class="p-6">
+                <div class="flex justify-between items-start mb-4">
+                  <span class="bg-red-900/40 text-red-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">${item.date}</span>
+                  <span class="text-xs text-gray-500 font-mono">${item.source}</span>
+                </div>
+                <h3 class="text-2xl font-bold text-white mb-3">${item.name}</h3>
+                <p class="text-gray-400 text-sm leading-relaxed">${item.about}</p>
+              </div>
+            </div>
+          `;
+        });
+        return;
+      }
+
+      shows.forEach((show, index) => {
+        if (filter === "unseen" && show.watched) return;
+
+        grid.innerHTML += `
+          <div class="show-card rounded-xl overflow-hidden shadow-2xl group">
+            <div class="trailer-thumb relative" style="background-image: url('${getYTThumb(show.trailer)}')">
+              <div class="absolute inset-0 bg-black/50 group-hover:bg-black/30 transition-all"></div>
+
+              ${show.watched
+                ? `<div class="absolute top-3 right-3 watched-badge px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">WATCHED</div>`
+                : ""
+              }
+
+              <div class="absolute inset-0 flex items-center justify-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                <a href="${show.trailer}" target="_blank" rel="noopener noreferrer"
+                   class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/40 hover:bg-white/40 transition">
+                  <div class="w-0 h-0 border-t-[8px] border-t-transparent border-l-[12px] border-l-white border-b-[8px] border-b-transparent ml-1"></div>
+                </a>
+
+                <button onclick="window.toggleWatched(${index})"
+                        class="w-12 h-12 bg-zinc-800/80 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 hover:bg-zinc-700 transition"
+                        aria-label="Toggle watched">
+                  <svg class="w-6 h-6" style="color: ${show.watched ? 'var(--watched)' : '#ffffff'}"
+                       fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clip-rule="evenodd"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="p-6">
+              <div class="flex gap-2 mb-3">
+                <span class="tag">${show.type}</span>
+              </div>
+              <h3 class="text-xl font-bold text-white mb-2 leading-tight">${show.name}</h3>
+              <p class="text-gray-400 text-sm leading-relaxed h-[60px] overflow-hidden">${show.about}</p>
+
+              <div class="mt-4 flex items-center gap-2">
+                <span class="text-[10px] font-mono uppercase" style="color: ${show.watched ? 'var(--watched)' : '#71717a'}">
+                  ${show.watched ? "● MISSION COMPLETE" : "○ ACTIVE LEAD / UNSEEN"}
+                </span>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    // Boot
+    shows = loadShows();
+    renderLibrary(currentFilter);
+  </script>
+</body>
+</html>
